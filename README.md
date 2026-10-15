@@ -65,7 +65,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1   # Windows PowerShell
 - **路由**：登录 `/login`、状态 `/status`、日志 `/logs`、设置 `/settings`，支持深链接与浏览器前进后退，未登录自动跳转登录页；
 - **状态**：每网口卡片（模式、状态徽标、IP/MAC、账号、最近动作结果原文）+ 按钮：立即探测 / 登录 / 下线 / 模式切换；
 - **日志**：本页会话事件（动作结果、状态变化）；
-- **设置**：表单编辑全部配置，保存时全量校验，合法则落盘 `config.json` 并即时生效，保存成功 / 失败在右下角弹窗提示；`web.listen` 变更需重启进程。
+- **设置**：表单编辑全部配置，保存时全量校验，合法则落盘 `config.json` 并即时生效，保存成功 / 失败在右下角弹窗提示；`web.listen` 变更需重启进程。「出口网口绑定」的定位值（系统网口名 / 网口物理地址）支持手填与「从本机选择」两种方式，点「识别本机」刷新本机网口清单（名称 / MAC / IPv4 / 启用状态）。
 
 行为要点：
 
@@ -83,6 +83,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1   # Windows PowerShell
 
 ```
 GET  /api/status                     状态快照
+GET  /api/netifs                     本机网口清单（设置页「从本机选择」数据源）
 GET  /api/config                     读配置
 PUT  /api/config                     写配置（全量校验 + 落盘 + 即时生效）
 POST /api/probe/{网口}               立即探测

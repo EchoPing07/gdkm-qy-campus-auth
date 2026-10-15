@@ -30,7 +30,7 @@ func applyVersion() {
 //     由前端按 URL 路径切换「登录 / 状态 / 日志 / 设置」视图，深链接可直接刷新；
 //   - 鉴权：config.web.password 明文比对；登录成功发随机 cookie（内存态，重启失效）；
 //     无 HTTPS / PBKDF2 / CSRF / 防暴破 / 会话过期，仅限可信网络使用。
-//   - API（同一 cookie 校验，一个中间件）：GET /api/status、GET/PUT /api/config、
+//   - API（同一 cookie 校验，一个中间件）：GET /api/status、GET /api/netifs、GET/PUT /api/config、
 //     POST /api/{probe|login|logout|mode}/{网口}，另有管理会话的 POST /api/login、/api/logout。
 type WebServer struct {
 	mgr      *Manager
@@ -54,6 +54,7 @@ func (s *WebServer) Handler() http.Handler {
 	mux.HandleFunc("POST /api/logout", s.handleSessionLogout)
 	// 业务 API（cookie 校验）
 	mux.HandleFunc("GET /api/status", s.auth(s.handleStatus))
+	mux.HandleFunc("GET /api/netifs", s.auth(s.handleNetifs))
 	mux.HandleFunc("GET /api/config", s.auth(s.handleGetConfig))
 	mux.HandleFunc("PUT /api/config", s.auth(s.handlePutConfig))
 	mux.HandleFunc("POST /api/probe/{key}", s.auth(s.actionHandler(func(w *Worker) ActionResult { return w.OpProbe() })))
@@ -129,6 +130,11 @@ func (s *WebServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"now":        time.Now().Unix(),
 		"interfaces": s.mgr.Status(),
 	})
+}
+
+// handleNetifs 本机网口清单：设置页出口网口绑定的「从本机选择」下拉数据源。
+func (s *WebServer) handleNetifs(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"interfaces": ListNetifs()})
 }
 
 func (s *WebServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {

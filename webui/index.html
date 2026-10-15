@@ -23,7 +23,7 @@
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
   }
-  button, input, select {
+  button, input, select, option {
     font: inherit;
     color: inherit;
     background: var(--bg);
@@ -133,6 +133,44 @@
     margin-bottom: 10px;
   }
   .if-item:last-child { margin-bottom: 0; }
+  .if-wrap { position: relative; }
+  .if-drop {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    z-index: 60;
+    min-width: 100%;
+    width: max-content;
+    max-width: min(320px, calc(100vw - 40px));
+    background: var(--bg);
+    border: 1px solid var(--line-dark);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.06);
+    max-height: 240px;
+    overflow-y: auto;
+    scrollbar-width: none;
+    display: none;
+  }
+  .if-drop::-webkit-scrollbar { display: none; }
+  .if-drop.open { display: block; }
+  .if-drop-item {
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .if-drop-item .val,
+  .if-drop-item .sub {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .if-drop-item .sub {
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .if-drop-item:hover { background: var(--fg); color: var(--bg); }
+  .if-drop-item:hover .sub { color: var(--bg); }
+  .if-drop-empty { padding: 6px 10px; font-size: 12px; color: var(--muted); cursor: default; }
   .if-row { display: grid; grid-template-columns: 110px 1fr 90px 90px 1fr 1fr 56px; gap: 8px; align-items: end; }
   @media (max-width: 680px) {
     .form-grid, .if-row { grid-template-columns: 1fr 1fr; }
@@ -298,7 +336,10 @@
 
     <div class="sec-title">
       <span>出口网口绑定</span>
-      <button onclick="addIfRow()" style="height:24px;font-size:12px;">新增网口</button>
+      <span style="display:flex;gap:6px;">
+        <button onclick="refreshNetifs(true)" style="height:24px;font-size:12px;">识别本机</button>
+        <button onclick="addIfRow()" style="height:24px;font-size:12px;">新增网口</button>
+      </span>
     </div>
     <div id="if-list" class="form-box"></div>
 
@@ -439,6 +480,7 @@ async function enterApp() {
   addLog("信息", "系统", "管理会话已建立");
   await refreshStatus();
   await refreshConfigMeta();
+  refreshNetifs(false); // 预取本机网口清单，设置页「从本机选择」下拉直接可用
 }
 
 /* ---------- 登录 / 退出 ---------- */
@@ -519,6 +561,19 @@ function renderDash() {
   });
 }
 
+/* ---------- 本机网口识别（设置页「从本机选择」数据源） ---------- */
+async function refreshNetifs(manual) {
+  try {
+    const r = await api("/api/netifs");
+    netifs = r.interfaces || [];
+    // 若已有打开的候选弹层（此前是「待识别」空提示），用新数据重渲染
+    const open = document.querySelector(".if-drop.open");
+    if (open) openDrop(+open.dataset.drop);
+  } catch (e) {
+    if (manual) toast("识别本机失败：" + e.message, false);
+  }
+}
+
 async function act(key, type) {
   try {
     const r = await api("/api/" + type + "/" + encodeURIComponent(key), { method: "POST" });
@@ -579,6 +634,8 @@ async function refreshConfigMeta() {
 }
 
 /* ---------- 设置页（表单交互） ---------- */
+let netifs = []; // 本机网口清单（设置页「从本机选择」用）
+
 async function loadSettings() {
   $("cfg-msg").classList.add("hidden");
   try {
@@ -625,8 +682,12 @@ function renderIfRows() {
         </div>
         <div class="field">
           <label>${it.locType === "name" ? "系统网口名" : "网口物理地址"}</label>
-          <input type="text" data-idx="${i}" data-field="locVal" value="${esc(it.locVal)}"
-                 placeholder="${it.locType === "name" ? "如：以太网" : "如：a4:5e:60..."}">
+          <div class="if-wrap">
+            <input type="text" data-idx="${i}" data-field="locVal" value="${esc(it.locVal)}"
+                   placeholder="${it.locType === "name" ? "如：以太网" : "如：a4:5e:60..."}"
+                   autocomplete="off">
+            <div class="if-drop" data-drop="${i}"></div>
+          </div>
         </div>
         <div class="field">
           <label>认证模式</label>
@@ -660,7 +721,11 @@ function renderIfRows() {
 function updIf(idx, key, val) {
   editingIfs[idx][key] = val;
   if (key === "mode" && val === "auto") editingIfs[idx].probe = true;
-  if (key === "locType" || key === "mode") renderIfRows();
+  if (key === "locType") {
+    // 名称与 MAC 取值不通用，切换定位方式后清空旧值，避免被当作新方式的合法值保存
+    editingIfs[idx].locVal = "";
+    renderIfRows();
+  }
 }
 
 function addIfRow() {
@@ -676,6 +741,55 @@ function delIfRow(idx) {
   editingIfs.splice(idx, 1);
   renderIfRows();
 }
+
+/* ---------- 定位值候选弹层：单输入框，手填 + 点击弹出本机网口直选 ---------- */
+
+// 候选项按定位方式生成：名称行 → 网口名，MAC 行 → MAC；文案附加上下文信息
+function netifPickLabel(nf, wantMac) {
+  const v = wantMac ? nf.mac : nf.name;
+  if (!v) return null;
+  const sub = [wantMac ? nf.name : (nf.mac || "无 MAC"), nf.ip, nf.up ? "" : "未启用"].filter(Boolean).join("｜");
+  return { value: v, sub };
+}
+
+// openDrop(idx)：渲染并弹出 idx 行候选；closeDrops()：收起全部弹层
+function openDrop(idx) {
+  closeDrops();
+  const drop = document.querySelector(`.if-drop[data-drop="${idx}"]`);
+  if (!drop) return;
+  const wantMac = editingIfs[idx].locType === "mac";
+  const items = netifs.map(nf => netifPickLabel(nf, wantMac)).filter(Boolean);
+  drop.innerHTML = items.length
+    ? items.map(p => `<div class="if-drop-item" data-value="${esc(p.value)}"><span class="val">${esc(p.value)}</span><span class="sub">${esc(p.sub)}</span></div>`).join("")
+    : `<div class="if-drop-empty">点右上「识别本机」刷新本机网口清单</div>`;
+  drop.classList.add("open");
+}
+function closeDrops() {
+  document.querySelectorAll(".if-drop.open").forEach(d => d.classList.remove("open"));
+}
+
+// 弹层选中 → 写回编辑态；输入框点击 → 弹出；弹层项点击 → 回填；外部点击 → 收起
+$("if-list").addEventListener("click", e => {
+  const item = e.target.closest(".if-drop-item");
+  if (item) {
+    const idx = +item.closest(".if-drop").dataset.drop;
+    editingIfs[idx].locVal = item.dataset.value;
+    closeDrops();
+    renderIfRows();
+    return;
+  }
+  const input = e.target.closest("input[data-field='locVal']");
+  if (input) {
+    const idx = +input.dataset.idx;
+    const drop = input.parentElement.querySelector(".if-drop");
+    const isOpen = drop.classList.contains("open");
+    closeDrops();
+    if (!isOpen) openDrop(idx);
+  }
+});
+document.addEventListener("click", e => {
+  if (!e.target.closest(".if-wrap")) closeDrops();
+});
 
 // 网口行输入 / 下拉 / 删除（事件委托，避免内联 JS 注入）
 $("if-list").addEventListener("input", e => {
@@ -764,6 +878,7 @@ async function saveConfig() {
   if (loggedIn) {
     await refreshStatus();
     await refreshConfigMeta();
+    refreshNetifs(false); // 同上：预取本机网口清单
   }
 })();
 </script>

@@ -686,18 +686,11 @@ func resolveSourceIP(cfg IfaceConfig) (net.IP, error) {
 			return nil, fmt.Errorf("找不到 MAC 为 %s 的网口", cfg.Mac)
 		}
 	}
-	addrs, err := iface.Addrs()
-	if err != nil {
-		return nil, err
+	ip4 := firstIPv4(iface)
+	if ip4 == nil {
+		return nil, fmt.Errorf("网口 %q 无 IPv4 地址", iface.Name)
 	}
-	for _, a := range addrs {
-		if ipn, ok := a.(*net.IPNet); ok {
-			if ip4 := ipn.IP.To4(); ip4 != nil {
-				return ip4, nil
-			}
-		}
-	}
-	return nil, fmt.Errorf("网口 %q 无 IPv4 地址", iface.Name)
+	return ip4, nil
 }
 
 func normalizeMac(s string) string {
@@ -706,4 +699,53 @@ func normalizeMac(s string) string {
 	s = strings.ReplaceAll(s, "-", "")
 	s = strings.ReplaceAll(s, ".", "")
 	return s
+}
+
+// firstIPv4 取网口首个 IPv4 地址，无则返回 nil（取址失败按无地址处理）。
+// resolveSourceIP 与 ListNetifs 共用。
+func firstIPv4(iface *net.Interface) net.IP {
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return nil
+	}
+	for _, a := range addrs {
+		if ipn, ok := a.(*net.IPNet); ok {
+			if ip4 := ipn.IP.To4(); ip4 != nil {
+				return ip4
+			}
+		}
+	}
+	return nil
+}
+
+// ---------- 本机网口清单（WebUI 设置页「从本机选择」数据源） ----------
+
+// NetifInfo 单个本机网口的识别信息。
+type NetifInfo struct {
+	Name string `json:"name"` // 系统网口名
+	Mac  string `json:"mac"`  // 物理地址（小写冒号格式，可能为空）
+	IP   string `json:"ip"`   // 首个 IPv4（可能为空）
+	Up   bool   `json:"up"`   // 网口是否启用
+}
+
+// ListNetifs 枚举本机全部网口（名称 / MAC / 首个 IPv4 / 启用状态），
+// 供设置页在「系统网口名 / 网口物理地址」定位值上直接选择，免手动抄写。
+func ListNetifs() []NetifInfo {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return []NetifInfo{}
+	}
+	out := make([]NetifInfo, 0, len(ifaces))
+	for i := range ifaces {
+		ni := NetifInfo{
+			Name: ifaces[i].Name,
+			Mac:  ifaces[i].HardwareAddr.String(),
+			Up:   ifaces[i].Flags&net.FlagUp != 0,
+		}
+		if ip4 := firstIPv4(&ifaces[i]); ip4 != nil {
+			ni.IP = ip4.String()
+		}
+		out = append(out, ni)
+	}
+	return out
 }
