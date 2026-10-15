@@ -4,7 +4,10 @@ $ErrorActionPreference = "Stop"
 Set-Location -Path $PSScriptRoot
 
 $env:CGO_ENABLED = "0"
-$LDFLAGS = "-s -w"
+# 版本号注入：环境变量 VERSION（如 v1.2.3），缺省 dev
+$Version = if ($env:VERSION) { $env:VERSION } else { "dev" }
+Write-Host "==> 版本号：$Version"
+$LDFLAGS = "-s -w -X main.Version=$Version"
 $OutDir = "dist"
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 

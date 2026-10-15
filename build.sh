@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # 一键交叉编译 5 个产物：linux amd64/arm64、windows amd64、macOS amd64/arm64
+# 版本号注入：环境变量 VERSION（如 v1.2.3），缺省 dev
 set -euo pipefail
 cd "$(dirname "$0")"
 
 export CGO_ENABLED=0
-LDFLAGS="-s -w"
+VERSION="${VERSION:-dev}"
+LDFLAGS="-s -w -X main.Version=${VERSION}"
+echo "==> 版本号：${VERSION}"
 OUT=dist
 mkdir -p "$OUT"
 

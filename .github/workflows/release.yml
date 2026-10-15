@@ -1,11 +1,16 @@
 name: Release
 
-# 推送 v* 标签时触发，也可以在 Actions 页面手动触发
+# 推送 v* 标签时触发，也可以在 Actions 页面手动触发（手动触发可填写版本号）
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号（如 v1.2.3），留空为 dev"
+        required: false
+        default: "dev"
 
 permissions:
   contents: write # 发布 Release 需要写权限
@@ -47,7 +52,14 @@ jobs:
         run: |
           OUT="gdkm-qy-campus-auth-${GOOS}-${GOARCH}"
           [ "$GOOS" = "windows" ] && OUT="${OUT}.exe"
-          go build -trimpath -ldflags "-s -w" -o "dist/${OUT}" .
+          # tag 触发用 tag 名（如 v1.2.3）；手动触发用输入的 version，缺省 dev
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            VERSION="$GITHUB_REF_NAME"
+          else
+            VERSION="${{ inputs.version || 'dev' }}"
+          fi
+          echo "Building ${OUT} with version ${VERSION}"
+          go build -trimpath -ldflags "-s -w -X main.Version=${VERSION}" -o "dist/${OUT}" .
           # 生成校验和文件
           cd dist
           sha256sum "${OUT}" > "${OUT}.sha256"

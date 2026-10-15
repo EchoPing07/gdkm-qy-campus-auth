@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/subtle"
 	_ "embed"
@@ -15,7 +16,18 @@ import (
 //go:embed webui/index.html
 var indexHTML []byte
 
+// versionHTML 嵌入页副本，启动时把标题旁的 __VERSION__ 占位符替换为真实版本号，
+// 替换结果缓存在此（幂等：重复替换无副作用，预留 UpdateConfig 换页场景）。
+var versionHTML []byte
+
+// applyVersion 启动时调用一次：把页面里的 __VERSION__ 替换为注入的版本号。
+func applyVersion() {
+	versionHTML = bytes.ReplaceAll(indexHTML, []byte("__VERSION__"), []byte(Version))
+}
+
 // WebUI 服务端：
+//   - 页面（SPA）：GET /、/login、/status、/logs、/settings 均返回同一份嵌入页，
+//     由前端按 URL 路径切换「登录 / 状态 / 日志 / 设置」视图，深链接可直接刷新；
 //   - 鉴权：config.web.password 明文比对；登录成功发随机 cookie（内存态，重启失效）；
 //     无 HTTPS / PBKDF2 / CSRF / 防暴破 / 会话过期，仅限可信网络使用。
 //   - API（同一 cookie 校验，一个中间件）：GET /api/status、GET/PUT /api/config、
@@ -27,12 +39,16 @@ type WebServer struct {
 }
 
 func NewWebServer(mgr *Manager) *WebServer {
+	applyVersion()
 	return &WebServer{mgr: mgr, sessions: map[string]struct{}{}}
 }
 
 func (s *WebServer) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", s.handleIndex)
+	// 页面路由：同一份 index.html，前端按 pathname 渲染对应视图
+	for _, p := range []string{"/{$}", "/login", "/status", "/logs", "/settings"} {
+		mux.HandleFunc("GET "+p, s.handleIndex)
+	}
 	// 管理会话
 	mux.HandleFunc("POST /api/login", s.handleSessionLogin)
 	mux.HandleFunc("POST /api/logout", s.handleSessionLogout)
@@ -49,7 +65,8 @@ func (s *WebServer) Handler() http.Handler {
 
 func (s *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(indexHTML)
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(versionHTML)
 }
 
 // auth 业务 API 中间件：校验 cookie 中的随机会话 token。

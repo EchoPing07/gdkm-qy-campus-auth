@@ -17,7 +17,7 @@ bash build.sh                        # Linux / macOS / Git Bash
 powershell -ExecutionPolicy Bypass -File build.ps1   # Windows PowerShell
 ```
 
-两个脚本等价，均输出 `dist/` 下 5 个产物：`gdkm-qy-campus-auth-{linux-amd64, linux-arm64, windows-amd64.exe, darwin-amd64, darwin-arm64}`。
+两个脚本等价，均输出 `dist/` 下 5 个产物：`gdkm-qy-campus-auth-{linux-amd64, linux-arm64, windows-amd64.exe, darwin-amd64, darwin-arm64}`。版本号通过环境变量 `VERSION` 注入（如 `VERSION=v1.2.3 bash build.sh`），缺省 `dev`；GitHub Actions 推送 `v*` 标签时自动以标签名注入。版本号显示于网页标题旁与启动日志。
 
 ## 运行
 
@@ -60,11 +60,12 @@ powershell -ExecutionPolicy Bypass -File build.ps1   # Windows PowerShell
 
 ## WebUI
 
-浏览器访问 `http://<listen地址>/`：
+浏览器访问 `http://<listen地址>/`，标题旁显示构建版本号：
 
+- **路由**：登录 `/login`、状态 `/status`、日志 `/logs`、设置 `/settings`，支持深链接与浏览器前进后退，未登录自动跳转登录页；
 - **状态**：每网口卡片（模式、状态徽标、IP/MAC、账号、最近动作结果原文）+ 按钮：立即探测 / 登录 / 下线 / 模式切换；
 - **日志**：本页会话事件（动作结果、状态变化）；
-- **设置**：表单编辑全部配置，保存时全量校验，合法则落盘 `config.json` 并即时生效； `web.listen` 变更需重启进程。
+- **设置**：表单编辑全部配置，保存时全量校验，合法则落盘 `config.json` 并即时生效，保存成功 / 失败在右下角弹窗提示；`web.listen` 变更需重启进程。
 
 行为要点：
 
@@ -76,7 +77,9 @@ powershell -ExecutionPolicy Bypass -File build.ps1   # Windows PowerShell
 
 ## API
 
-均需 cookie 会话（`POST /api/login` 换取）：
+页面路由：`GET /`、`/login`、`/status`、`/logs`、`/settings`（同一份嵌入页，前端按路径渲染）。
+
+以下接口均需 cookie 会话（`POST /api/login` 换取）：
 
 ```
 GET  /api/status                     状态快照

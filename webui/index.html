@@ -45,6 +45,7 @@
   #login-view { height: 100vh; display: flex; align-items: center; justify-content: center; }
   .login-box { width: 280px; border: 1px solid var(--line-dark); padding: 24px; }
   .login-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+  .login-title #ver { font-weight: normal; font-size: 11px; color: var(--muted); }
   .login-box input { margin-bottom: 12px; }
   .login-box button { width: 100%; }
   .msg-bar { font-size: 12px; margin-top: 8px; border-left: 2px solid var(--fg); padding-left: 6px; }
@@ -61,6 +62,7 @@
     margin-bottom: 20px;
   }
   .brand { font-weight: 600; font-size: 14px; }
+  .brand #ver { font-weight: normal; font-size: 11px; color: var(--muted); }
   nav { display: flex; gap: 4px; }
   nav button { border-color: transparent; color: var(--muted); height: 28px; }
   nav button.active { border-color: var(--line-dark); color: var(--fg); }
@@ -165,14 +167,54 @@
   .log-lvl { width: 36px; flex-shrink: 0; font-weight: 600; }
   .log-lvl.err { color: var(--err); }
   .log-if { color: var(--muted); flex-shrink: 0; }
+
+  /* 右下角弹窗提示 */
+  #toasts {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 320px;
+    max-width: calc(100vw - 32px);
+  }
+  .toast {
+    position: relative;
+    border: 1px solid var(--line-dark);
+    border-left: 3px solid var(--fg);
+    background: var(--bg);
+    padding: 7px 26px 7px 10px;
+    font-size: 12px;
+    animation: toast-in 0.18s ease;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.06);
+  }
+  .toast.err { border-color: var(--err); border-left-color: var(--err); color: var(--err); }
+  .toast-x {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 24px;
+    height: 100%;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1;
+  }
+  .toast-x:hover { background: transparent; color: var(--fg); }
+  .toast.out { opacity: 0; transform: translateY(6px); transition: opacity 0.2s, transform 0.2s; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 </style>
 </head>
 <body>
 
-<!-- 登录页 -->
-<div id="login-view">
+<!-- 登录页 /login -->
+<div id="login-view" class="hidden">
   <form class="login-box" onsubmit="doLogin(event)">
-    <div class="login-title">校园网认证管理</div>
+    <div class="login-title">校园网认证管理 <span id="ver">__VERSION__</span></div>
     <input type="password" id="pwd-input" placeholder="请输入密码" autofocus>
     <button type="submit" class="primary">进入系统</button>
     <div id="login-err" class="msg-bar err hidden"></div>
@@ -182,22 +224,22 @@
 <!-- 主界面 -->
 <div id="app-view" class="hidden">
   <header>
-    <div class="brand">校园网认证</div>
+    <div class="brand">校园网认证 <span id="ver">__VERSION__</span></div>
     <nav>
-      <button id="tab-dash" class="active" onclick="switchTab('dash')">状态</button>
-      <button id="tab-log" onclick="switchTab('log')">日志</button>
-      <button id="tab-set" onclick="switchTab('set')">设置</button>
+      <button id="tab-dash" onclick="navigate('/status')">状态</button>
+      <button id="tab-log" onclick="navigate('/logs')">日志</button>
+      <button id="tab-set" onclick="navigate('/settings')">设置</button>
       <button onclick="doLogout()">退出</button>
     </nav>
   </header>
 
-  <!-- 状态仪表盘 -->
+  <!-- 状态仪表盘 /status -->
   <main id="view-dash">
     <div id="flash" class="hidden"></div>
     <div id="cards" class="grid"></div>
   </main>
 
-  <!-- 运行日志 -->
+  <!-- 运行日志 /logs -->
   <main id="view-log" class="hidden">
     <div class="log-head">
       <span id="log-meta"></span>
@@ -206,7 +248,7 @@
     <div id="log-list" class="log-box"></div>
   </main>
 
-  <!-- 交互设置 -->
+  <!-- 交互设置 /settings -->
   <main id="view-set" class="hidden">
     <div class="sec-title"><span>全局与日志参数</span></div>
     <div class="form-box">
@@ -268,6 +310,9 @@
   </main>
 </div>
 
+<!-- 右下角弹窗提示 -->
+<div id="toasts"></div>
+
 <script>
 "use strict";
 
@@ -279,6 +324,40 @@ let editingIfs = [];       // 设置页网口行编辑态
 let prevStates = {};       // 客户端状态变化检测
 let loggedIn = false;
 let flashTimer = null;
+
+/* ---------- 路由（/login /status /logs /settings） ---------- */
+const ROUTES = { "/": "dash", "/login": "login", "/status": "dash", "/logs": "log", "/settings": "set" };
+
+function curRoute() {
+  return ROUTES[location.pathname] || "dash";
+}
+
+function navigate(path, replace) {
+  if (location.pathname !== path) {
+    history[replace ? "replaceState" : "pushState"]({}, "", path);
+  }
+  render();
+}
+
+function render() {
+  let tab = curRoute();
+  // 未登录一律重定向到 /login；已登录访问 /login 跳回 /status
+  if (!loggedIn && tab !== "login") { history.replaceState({}, "", "/login"); tab = "login"; }
+  if (loggedIn && tab === "login") { history.replaceState({}, "", "/status"); tab = "dash"; }
+
+  $("login-view").classList.toggle("hidden", tab !== "login");
+  $("app-view").classList.toggle("hidden", tab === "login");
+  ["dash", "log", "set"].forEach(t => {
+    $("tab-" + t).classList.toggle("active", t === tab);
+    $("view-" + t).classList.toggle("hidden", t !== tab);
+  });
+  if (tab === "login") { $("pwd-input").focus(); return; }
+  if (tab === "dash") renderDash();
+  if (tab === "log") renderLogs();
+  if (tab === "set") loadSettings();
+}
+
+window.addEventListener("popstate", render);
 
 /* ---------- 工具 ---------- */
 const $ = id => document.getElementById(id);
@@ -311,6 +390,29 @@ function flash(text, ok) {
   if (text) flashTimer = setTimeout(() => el.classList.add("hidden"), 5000);
 }
 
+/* ---------- 右下角弹窗提示 ---------- */
+function toast(text, ok) {
+  if (!text) return;
+  const wrap = $("toasts");
+  const el = document.createElement("div");
+  el.className = "toast" + (ok === false ? " err" : "");
+  const span = document.createElement("span");
+  span.textContent = text;
+  const x = document.createElement("button");
+  x.type = "button";
+  x.className = "toast-x";
+  x.textContent = "×";
+  el.append(span, x);
+  wrap.appendChild(el);
+  while (wrap.children.length > 4) wrap.firstChild.remove(); // 最多同时 4 条
+  const close = () => {
+    el.classList.add("out");
+    setTimeout(() => el.remove(), 220);
+  };
+  const timer = setTimeout(close, 4000);
+  x.onclick = () => { clearTimeout(timer); close(); };
+}
+
 /* ---------- API ---------- */
 async function api(path, opts = {}) {
   const r = await fetch(path, opts);
@@ -328,21 +430,13 @@ function onSessionLost() {
   const was = loggedIn;
   loggedIn = false;
   if (was) addLog("错误", "系统", "会话已失效，请重新登录");
-  showLogin();
-}
-
-function showLogin() {
-  $("app-view").classList.add("hidden");
-  $("login-view").classList.remove("hidden");
-  $("pwd-input").focus();
+  navigate("/login", true);
 }
 
 async function enterApp() {
   loggedIn = true;
-  $("login-view").classList.add("hidden");
-  $("app-view").classList.remove("hidden");
+  navigate("/status");
   addLog("信息", "系统", "管理会话已建立");
-  switchTab("dash");
   await refreshStatus();
   await refreshConfigMeta();
 }
@@ -368,18 +462,8 @@ async function doLogin(e) {
 
 async function doLogout() {
   try { await api("/api/logout", { method: "POST" }); } catch (e) {}
-  showLogin();
-}
-
-/* ---------- 导航 ---------- */
-function switchTab(tab) {
-  ["dash", "log", "set"].forEach(t => {
-    $("tab-" + t).classList.toggle("active", t === tab);
-    $("view-" + t).classList.toggle("hidden", t !== tab);
-  });
-  if (tab === "dash") renderDash();
-  if (tab === "log") renderLogs();
-  if (tab === "set") loadSettings();
+  loggedIn = false;
+  navigate("/login");
 }
 
 /* ---------- 仪表盘 ---------- */
@@ -630,16 +714,16 @@ async function saveConfig() {
   };
 
   // 客户端校验（与服务端校验规则一致；服务端会再全量校验一次）
-  if (!next.web.listen || !next.web.password) return showCfgMsg("校验未通过：网页监听地址与管理密码不能为空");
-  if (!(next.check_interval > 0)) return showCfgMsg("校验未通过：探测周期必须大于 0");
-  if (!Number.isInteger(next.login_retries) || next.login_retries < 0) return showCfgMsg("校验未通过：自动重试次数必须为不小于 0 的整数");
-  if (!(next.retry_interval > 0)) return showCfgMsg("校验未通过：重试间隔必须大于 0");
-  if (isNaN(next.reject_cooldown) || next.reject_cooldown < 0) return showCfgMsg("校验未通过：拒绝冷却期不能小于 0");
-  if (!next.interfaces.length) return showCfgMsg("校验未通过：至少需要配置一个网口");
+  if (!next.web.listen || !next.web.password) return invalid("网页监听地址与管理密码不能为空");
+  if (!(next.check_interval > 0)) return invalid("探测周期必须大于 0");
+  if (!Number.isInteger(next.login_retries) || next.login_retries < 0) return invalid("自动重试次数必须为不小于 0 的整数");
+  if (!(next.retry_interval > 0)) return invalid("重试间隔必须大于 0");
+  if (isNaN(next.reject_cooldown) || next.reject_cooldown < 0) return invalid("拒绝冷却期不能小于 0");
+  if (!next.interfaces.length) return invalid("至少需要配置一个网口");
   for (let i = 0; i < next.interfaces.length; i++) {
     const it = next.interfaces[i];
-    if (!(it.name || it.mac)) return showCfgMsg(`校验未通过：第 ${i + 1} 个网口未填写网口名称或物理地址`);
-    if (!it.user || !it.password) return showCfgMsg(`校验未通过：第 ${i + 1} 个网口未填写认证账号或密码`);
+    if (!(it.name || it.mac)) return invalid(`第 ${i + 1} 个网口未填写网口名称或物理地址`);
+    if (!it.user || !it.password) return invalid(`第 ${i + 1} 个网口未填写认证账号或密码`);
   }
 
   try {
@@ -653,21 +737,34 @@ async function saveConfig() {
     showCfgMsg("");
     $("cfg-msg").classList.add("hidden");
     flash(m, true);
+    toast(m, true); // 保存成功：右下角弹窗提示
     addLog("信息", "系统", m);
     refreshConfigMeta();
     refreshStatus();
   } catch (e) {
     showCfgMsg(e.message);
+    toast("保存失败：" + e.message, false);
     addLog("错误", "系统", "配置保存失败：" + e.message);
+  }
+
+  function invalid(text) {
+    showCfgMsg("校验未通过：" + text);
+    toast("校验未通过：" + text, false);
   }
 }
 
-/* ---------- 启动 ---------- */
+/* ---------- 启动：按当前路径渲染，已有会话则直接进入 ---------- */
 (async function boot() {
   try {
     await api("/api/status"); // 已有有效会话 cookie 则直接进入
-    await enterApp();
+    loggedIn = true;
+    addLog("信息", "系统", "管理会话已建立");
   } catch (e) { /* 停留在登录页 */ }
+  render();
+  if (loggedIn) {
+    await refreshStatus();
+    await refreshConfigMeta();
+  }
 })();
 </script>
 </body>

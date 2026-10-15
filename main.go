@@ -14,6 +14,11 @@ import (
 
 // gdkm-qy-campus-auth —— 广东科贸清远校区校园网认证保活工具
 // 形态：Go 单文件静态编译，CGO=0，仅标准库。无 CLI：启动即常驻 + WebUI。
+
+// Version 版本号，构建时通过 -ldflags "-X main.Version=v1.2.3" 注入；
+// 未注入（go build 直接编译）时显示 dev。
+var Version = "dev"
+
 func main() {
 	exePath, err := os.Executable()
 	if err != nil {
@@ -41,7 +46,7 @@ func main() {
 	if err := logger.Reconfigure(cfg.Log.Level, cfg.Log.File, cfg.Log.MaxMB, baseDir); err != nil {
 		fmt.Fprintln(os.Stderr, "[警告] 日志文件不可用（仅输出 stdout）：", err)
 	}
-	logger.Info("系统", "gdkm-qy-campus-auth 启动，配置文件：%s", cfgPath)
+	logger.Info("系统", "gdkm-qy-campus-auth %s 启动，配置文件：%s", Version, cfgPath)
 
 	mgr := NewManager(cfg, cfgPath, baseDir, logger)
 	mgr.Start()
