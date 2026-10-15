@@ -13,11 +13,11 @@
 ## 构建
 
 ```bash
-bash build.sh        # 输出 dist/ 下 5 个产物
-go build .           # 或只编译本机平台
+bash build.sh                        # Linux / macOS / Git Bash
+powershell -ExecutionPolicy Bypass -File build.ps1   # Windows PowerShell
 ```
 
-产物：`gdkm-qy-campus-auth-{linux-amd64, linux-arm64, windows-amd64.exe, darwin-amd64, darwin-arm64}`。
+两个脚本等价，均输出 `dist/` 下 5 个产物：`gdkm-qy-campus-auth-{linux-amd64, linux-arm64, windows-amd64.exe, darwin-amd64, darwin-arm64}`。
 
 ## 运行
 
