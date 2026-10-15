@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>校园网认证管理</title>
+<style>
+  :root {
+    --fg: #111;
+    --bg: #fff;
+    --muted: #777;
+    --line: #e0e0e0;
+    --line-dark: #111;
+    --bg-sub: #fafafa;
+    --err: #c00;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", monospace;
+    font-size: 13px;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, select {
+    font: inherit;
+    color: inherit;
+    background: var(--bg);
+    border: 1px solid var(--line-dark);
+    outline: none;
+    height: 30px;
+    padding: 0 10px;
+  }
+  input, select { border-color: var(--line); width: 100%; }
+  input:focus, select:focus { border-color: var(--line-dark); }
+  input:disabled, select:disabled { background: #f0f0f0; color: var(--muted); cursor: not-allowed; }
+  button { cursor: pointer; transition: background 0.1s, color 0.1s; width: auto; }
+  button:hover { background: var(--fg); color: var(--bg); }
+  button.primary { background: var(--fg); color: var(--bg); }
+  button.primary:hover { background: #333; }
+  .hidden { display: none !important; }
+
+  /* 登录 */
+  #login-view { height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .login-box { width: 280px; border: 1px solid var(--line-dark); padding: 24px; }
+  .login-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+  .login-box input { margin-bottom: 12px; }
+  .login-box button { width: 100%; }
+  .msg-bar { font-size: 12px; margin-top: 8px; border-left: 2px solid var(--fg); padding-left: 6px; }
+  .msg-bar.err { border-color: var(--err); color: var(--err); }
+
+  /* 主框架 */
+  #app-view { max-width: 780px; margin: 0 auto; padding: 28px 20px; }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--line-dark);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+  }
+  .brand { font-weight: 600; font-size: 14px; }
+  nav { display: flex; gap: 4px; }
+  nav button { border-color: transparent; color: var(--muted); height: 28px; }
+  nav button.active { border-color: var(--line-dark); color: var(--fg); }
+  nav button:hover { color: var(--fg); background: var(--bg-sub); }
+
+  /* 仪表盘 */
+  #flash {
+    margin-bottom: 12px;
+    border: 1px solid var(--line-dark);
+    border-left: 3px solid var(--fg);
+    padding: 6px 10px;
+    font-size: 12px;
+    background: var(--bg-sub);
+  }
+  #flash.err { border-color: var(--err); border-left-color: var(--err); color: var(--err); }
+  .grid { display: grid; gap: 14px; }
+  .card { border: 1px solid var(--line-dark); padding: 14px 16px; }
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 10px;
+  }
+  .if-title { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .tag { font-size: 11px; font-weight: normal; color: var(--muted); border: 1px solid var(--line); padding: 0 6px; }
+  .badge { font-size: 11px; padding: 1px 8px; border: 1px solid var(--line-dark); }
+  .badge.online { background: var(--fg); color: var(--bg); }
+  .badge.offline { background: var(--bg); color: var(--fg); }
+  .badge.out { border-style: dashed; color: var(--muted); border-color: var(--muted); }
+  .badge.rejected { border-style: dashed; color: var(--err); border-color: var(--err); }
+
+  .meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+  .meta-item span { display: block; font-size: 11px; color: var(--muted); }
+  .raw-box {
+    background: var(--bg-sub);
+    border: 1px solid var(--line);
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .actions button { border-color: var(--line); font-size: 12px; height: 28px; }
+  .actions button:hover { border-color: var(--line-dark); }
+
+  /* 设置表单 */
+  .sec-title {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .form-box { border: 1px solid var(--line-dark); padding: 14px 16px; margin-bottom: 20px; }
+  .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .if-item {
+    border: 1px solid var(--line);
+    background: var(--bg-sub);
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .if-item:last-child { margin-bottom: 0; }
+  .if-row { display: grid; grid-template-columns: 110px 1fr 90px 90px 1fr 1fr 56px; gap: 8px; align-items: end; }
+  @media (max-width: 680px) {
+    .form-grid, .if-row { grid-template-columns: 1fr 1fr; }
+  }
+  #cfg-msg { margin-bottom: 12px; }
+  .set-foot { display: flex; justify-content: space-between; align-items: center; }
+  .hint { font-size: 12px; color: var(--muted); }
+
+  /* 日志 */
+  .log-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid var(--line-dark);
+    border-bottom: none;
+    padding: 8px 12px;
+    background: var(--bg-sub);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .log-box {
+    border: 1px solid var(--line-dark);
+    height: 420px;
+    overflow-y: auto;
+    padding: 10px 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    background: var(--bg);
+  }
+  .log-line { padding: 3px 0; border-bottom: 1px dotted var(--line); display: flex; gap: 10px; }
+  .log-time { color: var(--muted); flex-shrink: 0; }
+  .log-lvl { width: 36px; flex-shrink: 0; font-weight: 600; }
+  .log-lvl.err { color: var(--err); }
+  .log-if { color: var(--muted); flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<!-- 登录页 -->
+<div id="login-view">
+  <form class="login-box" onsubmit="doLogin(event)">
+    <div class="login-title">校园网认证管理</div>
+    <input type="password" id="pwd-input" placeholder="请输入密码" autofocus>
+    <button type="submit" class="primary">进入系统</button>
+    <div id="login-err" class="msg-bar err hidden"></div>
+  </form>
+</div>
+
+<!-- 主界面 -->
+<div id="app-view" class="hidden">
+  <header>
+    <div class="brand">校园网认证</div>
+    <nav>
+      <button id="tab-dash" class="active" onclick="switchTab('dash')">状态</button>
+      <button id="tab-log" onclick="switchTab('log')">日志</button>
+      <button id="tab-set" onclick="switchTab('set')">设置</button>
+      <button onclick="doLogout()">退出</button>
+    </nav>
+  </header>
+
+  <!-- 状态仪表盘 -->
+  <main id="view-dash">
+    <div id="flash" class="hidden"></div>
+    <div id="cards" class="grid"></div>
+  </main>
+
+  <!-- 运行日志 -->
+  <main id="view-log" class="hidden">
+    <div class="log-head">
+      <span id="log-meta"></span>
+      <button onclick="clearLogs()" style="height:24px;font-size:11px;">清空显示</button>
+    </div>
+    <div id="log-list" class="log-box"></div>
+  </main>
+
+  <!-- 交互设置 -->
+  <main id="view-set" class="hidden">
+    <div class="sec-title"><span>全局与日志参数</span></div>
+    <div class="form-box">
+      <div class="form-grid">
+        <div class="field">
+          <label>网页监听地址</label>
+          <input type="text" id="f-listen">
+        </div>
+        <div class="field">
+          <label>网页管理密码</label>
+          <input type="text" id="f-web-pwd">
+        </div>
+        <div class="field">
+          <label>探测周期 (秒)</label>
+          <input type="number" id="f-check" min="1" step="any">
+        </div>
+        <div class="field">
+          <label>自动重试次数</label>
+          <input type="number" id="f-retries" min="0">
+        </div>
+        <div class="field">
+          <label>重试间隔 (秒)</label>
+          <input type="number" id="f-retry-int" min="1" step="any">
+        </div>
+        <div class="field">
+          <label>拒绝冷却期 (秒)</label>
+          <input type="number" id="f-cooldown" min="0" step="any">
+        </div>
+        <div class="field">
+          <label>日志级别</label>
+          <select id="f-log-lvl">
+            <option value="debug">调试</option>
+            <option value="info">信息</option>
+            <option value="error">错误</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>日志文件名</label>
+          <input type="text" id="f-log-file">
+        </div>
+        <div class="field">
+          <label>单文件上限 (兆字节)</label>
+          <input type="number" id="f-log-mb" min="1">
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-title">
+      <span>出口网口绑定</span>
+      <button onclick="addIfRow()" style="height:24px;font-size:12px;">新增网口</button>
+    </div>
+    <div id="if-list" class="form-box"></div>
+
+    <div id="cfg-msg" class="msg-bar err hidden"></div>
+    <div class="set-foot">
+      <span class="hint">注：网页监听地址变更需重启进程生效，其余配置保存即时生效</span>
+      <button class="primary" onclick="saveConfig()">保存设置</button>
+    </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- 全局状态 ---------- */
+let statusData = null;     // 最近一次 /api/status
+let configMeta = null;     // 最近一次 /api/config（日志页元信息用）
+let logs = [];             // 会话事件日志（仅本页内存）
+let editingIfs = [];       // 设置页网口行编辑态
+let prevStates = {};       // 客户端状态变化检测
+let loggedIn = false;
+let flashTimer = null;
+
+/* ---------- 工具 ---------- */
+const $ = id => document.getElementById(id);
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function nowStr() {
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function fmtTime(unix) {
+  const d = new Date(unix * 1000), p = n => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+function addLog(lvl, ifKey, text) {
+  logs.unshift({ time: nowStr(), lvl, ifKey, text });
+  if (logs.length > 200) logs.pop();
+  if (!$("view-log").classList.contains("hidden")) renderLogs();
+}
+
+function flash(text, ok) {
+  const el = $("flash");
+  el.textContent = text || "";
+  el.classList.toggle("hidden", !text);
+  el.classList.toggle("err", ok === false);
+  clearTimeout(flashTimer);
+  if (text) flashTimer = setTimeout(() => el.classList.add("hidden"), 5000);
+}
+
+/* ---------- API ---------- */
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts);
+  let data = null;
+  try { data = await r.json(); } catch (e) {}
+  if (r.status === 401) {
+    onSessionLost();
+    throw new Error((data && data.error) || "未登录或会话已失效");
+  }
+  if (!r.ok) throw new Error((data && data.error) || ("HTTP " + r.status));
+  return data;
+}
+
+function onSessionLost() {
+  const was = loggedIn;
+  loggedIn = false;
+  if (was) addLog("错误", "系统", "会话已失效，请重新登录");
+  showLogin();
+}
+
+function showLogin() {
+  $("app-view").classList.add("hidden");
+  $("login-view").classList.remove("hidden");
+  $("pwd-input").focus();
+}
+
+async function enterApp() {
+  loggedIn = true;
+  $("login-view").classList.add("hidden");
+  $("app-view").classList.remove("hidden");
+  addLog("信息", "系统", "管理会话已建立");
+  switchTab("dash");
+  await refreshStatus();
+  await refreshConfigMeta();
+}
+
+/* ---------- 登录 / 退出 ---------- */
+async function doLogin(e) {
+  e.preventDefault();
+  const err = $("login-err");
+  try {
+    await api("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: $("pwd-input").value })
+    });
+    err.classList.add("hidden");
+    $("pwd-input").value = "";
+    await enterApp();
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.remove("hidden");
+  }
+}
+
+async function doLogout() {
+  try { await api("/api/logout", { method: "POST" }); } catch (e) {}
+  showLogin();
+}
+
+/* ---------- 导航 ---------- */
+function switchTab(tab) {
+  ["dash", "log", "set"].forEach(t => {
+    $("tab-" + t).classList.toggle("active", t === tab);
+    $("view-" + t).classList.toggle("hidden", t !== tab);
+  });
+  if (tab === "dash") renderDash();
+  if (tab === "log") renderLogs();
+  if (tab === "set") loadSettings();
+}
+
+/* ---------- 仪表盘 ---------- */
+function badgeInfo(it) {
+  if (it.rejected) return { text: "已拒绝", cls: "rejected" };
+  if (it.state === "online") return { text: "已认证", cls: "online" };
+  if (it.state === "offline") return { text: "未认证", cls: "offline" };
+  if (it.state === "unprobed") return { text: "未探测", cls: "out" };
+  return { text: "不在校园网", cls: "out" };
+}
+
+function stateText(state) {
+  return { online: "已认证", offline: "未认证", unprobed: "未探测", out: "不在校园网" }[state] || state;
+}
+
+function renderDash() {
+  if (!statusData) return;
+  const box = $("cards");
+  const now = Date.now() / 1000;
+  const list = statusData.interfaces || [];
+  box.innerHTML = list.map((it, idx) => {
+    const b = badgeInfo(it);
+    const modeTag = it.mode === "auto" ? "自动模式" : "手动模式";
+    let raw = esc(it.last_action || (it.state === "unprobed" ? "已关闭周期探测，操作前将临时取参" : "暂无探测记录"));
+    if (it.rejected && it.cooldown_until > now) raw += `（冷却至 ${fmtTime(it.cooldown_until)}）`;
+    return `
+      <div class="card" data-i="${idx}">
+        <div class="card-head">
+          <div class="if-title"><span>${esc(it.key)}</span><span class="tag">${modeTag}</span></div>
+          <span class="badge ${b.cls}">${b.text}</span>
+        </div>
+        <div class="meta">
+          <div class="meta-item"><span>校园网地址</span>${esc(it.ip || "—")}</div>
+          <div class="meta-item"><span>物理地址</span>${esc(it.hw_mac || "—")}</div>
+          <div class="meta-item"><span>认证账号</span>${esc(it.user || "—")}</div>
+        </div>
+        <div class="raw-box" title="${raw}">${raw}</div>
+        <div class="actions">
+          <button data-act="probe">立即探测</button>
+          <button data-act="login">登录</button>
+          <button data-act="logout">下线</button>
+          <button data-act="mode">切换为${it.mode === "auto" ? "手动" : "自动"}</button>
+        </div>
+      </div>`;
+  }).join("") || `<div class="hint">无网口配置，请前往「设置」添加出口网口</div>`;
+
+  box.querySelectorAll(".card").forEach(card => {
+    const it = list[+card.dataset.i];
+    card.dataset.key = it.key;
+    card.querySelectorAll("button[data-act]").forEach(btn => {
+      btn.onclick = () => act(it.key, btn.dataset.act);
+    });
+  });
+}
+
+async function act(key, type) {
+  try {
+    const r = await api("/api/" + type + "/" + encodeURIComponent(key), { method: "POST" });
+    addLog(r.ok ? "信息" : "错误", key, r.message || "操作完成");
+    flash(r.message || "操作完成", r.ok);
+  } catch (e) {
+    addLog("错误", key, e.message);
+    flash(e.message, false);
+  }
+  refreshStatus();
+}
+
+/* ---------- 状态轮询 ---------- */
+async function refreshStatus() {
+  try {
+    statusData = await api("/api/status");
+    (statusData.interfaces || []).forEach(it => {
+      const prev = prevStates[it.key];
+      if (prev && prev !== it.state) {
+        addLog("信息", it.key, "状态变化：" + stateText(prev) + " → " + stateText(it.state));
+      }
+      prevStates[it.key] = it.state;
+    });
+    if (!$("view-dash").classList.contains("hidden")) renderDash();
+  } catch (e) { /* 401 已由 api() 处理 */ }
+}
+setInterval(() => { if (loggedIn) refreshStatus(); }, 3000);
+
+/* ---------- 日志页（本页会话事件） ---------- */
+function renderLogs() {
+  const lg = (configMeta && configMeta.log) || {};
+  const lvlName = { debug: "调试", info: "信息", error: "错误" }[lg.level] || "—";
+  $("log-meta").textContent = `文件：${lg.file || "—"} ｜ 级别：${lvlName} ｜ 滚动上限：${lg.max_mb || "—"} 兆字节`;
+  const box = $("log-list");
+  if (!logs.length) {
+    box.innerHTML = `<div style="color:var(--muted);">暂无日志记录</div>`;
+    return;
+  }
+  box.innerHTML = logs.map(l => `
+    <div class="log-line">
+      <span class="log-time">${esc(l.time)}</span>
+      <span class="log-lvl${l.lvl === "错误" ? " err" : ""}">${esc(l.lvl)}</span>
+      <span class="log-if">[${esc(l.ifKey)}]</span>
+      <span>${esc(l.text)}</span>
+    </div>`).join("");
+}
+
+function clearLogs() {
+  logs = [];
+  renderLogs();
+}
+
+async function refreshConfigMeta() {
+  try {
+    configMeta = await api("/api/config");
+    if (!$("view-log").classList.contains("hidden")) renderLogs();
+  } catch (e) { /* 忽略 */ }
+}
+
+/* ---------- 设置页（表单交互） ---------- */
+async function loadSettings() {
+  $("cfg-msg").classList.add("hidden");
+  try {
+    const cfg = await api("/api/config");
+    $("f-listen").value = cfg.web.listen;
+    $("f-web-pwd").value = cfg.web.password;
+    $("f-check").value = cfg.check_interval;
+    $("f-retries").value = cfg.login_retries;
+    $("f-retry-int").value = cfg.retry_interval;
+    $("f-cooldown").value = cfg.reject_cooldown;
+    $("f-log-lvl").value = cfg.log.level;
+    $("f-log-file").value = cfg.log.file;
+    $("f-log-mb").value = cfg.log.max_mb;
+    editingIfs = (cfg.interfaces || []).map(it => ({
+      locType: it.mac ? "mac" : "name",
+      locVal: it.name || it.mac || "",
+      mode: it.mode || "manual",
+      probe: it.mode === "auto" ? true : (it.probe !== false),
+      user: it.user || "",
+      password: it.password || ""
+    }));
+    renderIfRows();
+  } catch (e) {
+    showCfgMsg("配置加载失败：" + e.message);
+  }
+}
+
+function showCfgMsg(text) {
+  const msg = $("cfg-msg");
+  msg.textContent = text;
+  msg.classList.remove("hidden");
+}
+
+function renderIfRows() {
+  $("if-list").innerHTML = editingIfs.map((it, i) => `
+    <div class="if-item">
+      <div class="if-row">
+        <div class="field">
+          <label>定位方式</label>
+          <select data-idx="${i}" data-field="locType">
+            <option value="name" ${it.locType === "name" ? "selected" : ""}>按网口名称</option>
+            <option value="mac" ${it.locType === "mac" ? "selected" : ""}>按物理地址</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>${it.locType === "name" ? "系统网口名" : "网口物理地址"}</label>
+          <input type="text" data-idx="${i}" data-field="locVal" value="${esc(it.locVal)}"
+                 placeholder="${it.locType === "name" ? "如：以太网" : "如：a4:5e:60..."}">
+        </div>
+        <div class="field">
+          <label>认证模式</label>
+          <select data-idx="${i}" data-field="mode">
+            <option value="manual" ${it.mode === "manual" ? "selected" : ""}>手动</option>
+            <option value="auto" ${it.mode === "auto" ? "selected" : ""}>自动</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>周期探测</label>
+          <select data-idx="${i}" data-field="probe" ${it.mode === "auto" ? "disabled" : ""}>
+            <option value="true" ${it.probe || it.mode === "auto" ? "selected" : ""}>开启</option>
+            <option value="false" ${!it.probe && it.mode === "manual" ? "selected" : ""}>关闭</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>认证账号</label>
+          <input type="text" data-idx="${i}" data-field="user" value="${esc(it.user)}">
+        </div>
+        <div class="field">
+          <label>认证密码</label>
+          <input type="text" data-idx="${i}" data-field="password" value="${esc(it.password)}">
+        </div>
+        <div class="field">
+          <button data-del="${i}" style="width:100%;">删除</button>
+        </div>
+      </div>
+    </div>`).join("");
+}
+
+function updIf(idx, key, val) {
+  editingIfs[idx][key] = val;
+  if (key === "mode" && val === "auto") editingIfs[idx].probe = true;
+  if (key === "locType" || key === "mode") renderIfRows();
+}
+
+function addIfRow() {
+  editingIfs.push({ locType: "name", locVal: "", mode: "manual", probe: true, user: "", password: "" });
+  renderIfRows();
+}
+
+function delIfRow(idx) {
+  if (editingIfs.length <= 1) {
+    showCfgMsg("校验未通过：至少需要保留一个出口网口");
+    return;
+  }
+  editingIfs.splice(idx, 1);
+  renderIfRows();
+}
+
+// 网口行输入 / 下拉 / 删除（事件委托，避免内联 JS 注入）
+$("if-list").addEventListener("input", e => {
+  const el = e.target;
+  if (el.dataset.idx === undefined || !el.dataset.field) return;
+  updIf(+el.dataset.idx, el.dataset.field, el.value);
+});
+$("if-list").addEventListener("change", e => {
+  const el = e.target;
+  if (el.dataset.idx === undefined || !el.dataset.field) return;
+  updIf(+el.dataset.idx, el.dataset.field, el.dataset.field === "probe" ? el.value === "true" : el.value);
+});
+$("if-list").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-del]");
+  if (btn) delIfRow(+btn.dataset.del);
+});
+
+async function saveConfig() {
+  const v = id => $(id).value;
+  const next = {
+    web: { listen: v("f-listen").trim(), password: v("f-web-pwd").trim() },
+    log: {
+      level: v("f-log-lvl"),
+      file: v("f-log-file").trim() || "campus-auth.log",
+      max_mb: Number(v("f-log-mb")) || 4
+    },
+    check_interval: Number(v("f-check")),
+    login_retries: Number(v("f-retries")),
+    retry_interval: Number(v("f-retry-int")),
+    reject_cooldown: Number(v("f-cooldown")),
+    interfaces: editingIfs.map(it => {
+      const obj = { mode: it.mode, probe: it.mode === "auto" ? true : it.probe, user: it.user.trim(), password: it.password.trim() };
+      obj[it.locType] = it.locVal.trim();
+      return obj;
+    })
+  };
+
+  // 客户端校验（与服务端校验规则一致；服务端会再全量校验一次）
+  if (!next.web.listen || !next.web.password) return showCfgMsg("校验未通过：网页监听地址与管理密码不能为空");
+  if (!(next.check_interval > 0)) return showCfgMsg("校验未通过：探测周期必须大于 0");
+  if (!Number.isInteger(next.login_retries) || next.login_retries < 0) return showCfgMsg("校验未通过：自动重试次数必须为不小于 0 的整数");
+  if (!(next.retry_interval > 0)) return showCfgMsg("校验未通过：重试间隔必须大于 0");
+  if (isNaN(next.reject_cooldown) || next.reject_cooldown < 0) return showCfgMsg("校验未通过：拒绝冷却期不能小于 0");
+  if (!next.interfaces.length) return showCfgMsg("校验未通过：至少需要配置一个网口");
+  for (let i = 0; i < next.interfaces.length; i++) {
+    const it = next.interfaces[i];
+    if (!(it.name || it.mac)) return showCfgMsg(`校验未通过：第 ${i + 1} 个网口未填写网口名称或物理地址`);
+    if (!it.user || !it.password) return showCfgMsg(`校验未通过：第 ${i + 1} 个网口未填写认证账号或密码`);
+  }
+
+  try {
+    const r = await api("/api/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(next)
+    });
+    let m = r.message || "设置已保存并即时生效";
+    if (r.notes && r.notes.length) m += "；" + r.notes.join("；");
+    showCfgMsg("");
+    $("cfg-msg").classList.add("hidden");
+    flash(m, true);
+    addLog("信息", "系统", m);
+    refreshConfigMeta();
+    refreshStatus();
+  } catch (e) {
+    showCfgMsg(e.message);
+    addLog("错误", "系统", "配置保存失败：" + e.message);
+  }
+}
+
+/* ---------- 启动 ---------- */
+(async function boot() {
+  try {
+    await api("/api/status"); // 已有有效会话 cookie 则直接进入
+    await enterApp();
+  } catch (e) { /* 停留在登录页 */ }
+})();
+</script>
+</body>
+</html>

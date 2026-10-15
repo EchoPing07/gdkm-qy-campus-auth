@@ -1,0 +1,12 @@
+# 产物与运行时文件
+dist/
+gdkm-qy-campus-auth
+gdkm-qy-campus-auth-*
+*.exe
+config.json
+config.json.tmp
+campus-auth.log
+campus-auth.log.old
+
+# 含未脱敏真实数据，禁止入库
+docs/
